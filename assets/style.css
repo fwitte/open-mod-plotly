@@ -11,8 +11,9 @@ div {
     font-weight: 600;
 }
 
-#someuniquestuff {
-    color: magenta;
+#description {
+    color: black;
+    font-weight: 300;
 }
 
 /* see https://css-tricks.com/snippets/css/a-guide-to-flexbox/ */

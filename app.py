@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# dash imports
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
@@ -7,66 +8,57 @@ import pandas as pd
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 
+import socket
+local_ip = [l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] 
+if not ip.startswith("127.")][:1], [[(s.connect(('8.8.8.8', 53)), 
+s.getsockname()[0], s.close()) for s in [socket.socket(socket.AF_INET, 
+socket.SOCK_DGRAM)]][0][1]]) if l][0][0]
 
-def extract_country(country_iso, df):
-    return {
-        'x': df.loc[country_iso].year,
-        'y': df.loc[country_iso].fertility,
-        'mode': 'lines+markers',
-        'name': df.loc[country_iso].country.unique()[0]
-    }
+df_table = pd.read_csv('data/bme280.csv', index_col=0)
 
-df_table = pd.read_csv('data/children-per-woman-UN.csv')
-df = df_table.set_index('country_iso')
+def make_layout():
 
-# loading external resources
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
-options = dict(
-    # external_stylesheets=external_stylesheets
-)
+    return html.Div(
+        children=[
+            html.H1(children='Wetterdaten'),
 
-demo_app = dash.Dash(__name__, **options)
-
-demo_app.layout = html.Div(
-    children=[
-        html.H1(children='Hello openmod'),
-
-        html.Div(children='Dash: A web application framework for Python.'),
-        html.Div('Here is a div', id='someuniquestuff'),
-        # html.Div(children=[
-        #     html.Div('Number one'),
-        #     html.Div('Number two')], className='horizontal'),
-        # dash_table.DataTable(
-        #     id='table',
-        #     columns=[{"name": i, "id": i} for i in df_table.columns],
-        #     data=df_table.to_dict('records'),
-        #     style_table={
-        #         'maxHeight': '300px',
-        #         'overflowY': 'scroll'
-        #     },
-        #     filter_action="native",
-        #     sort_action="native",
-        #     fixed_rows={'headers': True, 'data': 0}
-        # ),
-        dcc.Dropdown(
-            id='country-select',
-            options=[
-                {'label': df.loc[i].country.unique()[0], 'value': i}
-                for i in df_table.country_iso.dropna().unique()
-            ],
-            multi=True),
-        dcc.Graph(
-            id='example-graph',
-            figure={
-                'data': [
-                ],
-                'layout': {
-                    'title': 'Dash Data Visualization'
-                }
-            }
-        )
-    ]
-)
+            html.Div(children='Dash: A web application framework for Python.'),
+            html.Div('Aus dieser Tabelle kannst du die Messerwerte des BME Sensors entnehmen.', id='description'),
+            # html.Div(children=[
+            #     html.Div('Number one'),
+            #     html.Div('Number two')], className='horizontal'),
+            dcc.Interval(id='update-table', interval=5000),
+            dash_table.DataTable(
+                id='table',
+                columns=[{"name": i, "id": i} for i in df_table.columns],
+                data=df_table.to_dict('records'),
+                style_table={
+                    'maxHeight': '300px',
+                    'overflowY': 'scroll'
+                },
+                filter_action="native",
+                sort_action="native",
+                fixed_rows={'headers': True, 'data': 0}
+            )
+    ##        dcc.Dropdown(
+    ##            id='country-select',
+    ##            options=[
+    ##                {'label': i, 'value': }
+    ##                for i in labels
+    ##            ],
+    ##            multi=True),
+    ##        dcc.Graph(
+    ##            id='example-graph',
+    ##            figure={
+    ##                'data': [
+    ##                ],
+    ##                'layout': {
+    ##                    'title': 'Dash Data Visualization'
+    ##                }
+    ##            }
+    ##        )
+        ]
+    )
 
 # @demo_app.callback(
 #     Output(component_id='example-graph', component_property='figure'),
@@ -85,26 +77,35 @@ demo_app.layout = html.Div(
 
 #     return fig
 
+##@demo_app.callback(
+##    [Output(component_id='example-graph', component_property='figure'),
+##     Output(component_id='someuniquestuff', component_property='children')],
+##    [Input(component_id='country-select', component_property='value')],
+##    [State(component_id='example-graph', component_property='figure')])
+##def update_country(countries, fig):
+##    if countries is None:
+##        raise PreventUpdate
+##
+##    fig = {
+##        'data': [
+##            extract_country(country_iso, df)
+##            for country_iso in countries
+##        ],
+##        'layout': {
+##            'title': 'Dash Data Visualization'
+##        }
+##    }
+##
+##    return fig, countries
+
+demo_app = dash.Dash(__name__)
+demo_app.layout = make_layout()
+
 @demo_app.callback(
-    [Output(component_id='example-graph', component_property='figure'),
-     Output(component_id='someuniquestuff', component_property='children')],
-    [Input(component_id='country-select', component_property='value')],
-    [State(component_id='example-graph', component_property='figure')])
-def update_country(countries, fig):
-    if countries is None:
-        raise PreventUpdate
-
-    fig = {
-        'data': [
-            extract_country(country_iso, df)
-            for country_iso in countries
-        ],
-        'layout': {
-            'title': 'Dash Data Visualization'
-        }
-    }
-
-    return fig, countries
+    Output('table', 'data'), [Input('update-table', 'n_intervals')])
+def update_data(n):
+    df = pd.read_csv('data/bme280.csv', index_col=0)
+    return df.to_dict('records')
 
 if __name__ == '__main__':
-    demo_app.run_server(debug=True, host='192.168.178.23')
+    demo_app.run_server(debug=True, host=local_ip)
